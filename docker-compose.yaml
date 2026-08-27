@@ -1,0 +1,77 @@
+name: addy
+
+services:
+  db:
+    image: mariadb:12
+    container_name: addy_db
+    command:
+      - "mariadbd"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - addy_net
+
+  redis:
+    image: redis:8-alpine
+    container_name: addy_redis
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - addy_net
+
+  addy:
+    image: anonaddy/anonaddy:latest
+    # Caso queira buildar diretamente do repositório Git no Windows com BuildKit:
+    # build: https://github.com/anonaddy/docker.git#1.7.1-r0
+    container_name: addy
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "25:25"
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - addy_data:/data
+    env_file:
+      - "./.env"
+    environment:
+      DB_HOST: db
+      DB_DATABASE: ${MYSQL_DATABASE}
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+    restart: unless-stopped
+    networks:
+      - addy_net
+
+volumes:
+  db_data:
+  redis_data:
+  addy_data:
+
+networks:
+  addy_net:
+    driver: bridge
