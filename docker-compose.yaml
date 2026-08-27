@@ -52,7 +52,7 @@ services:
         condition: service_healthy
     ports:
       - "25:25"
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:16000:8000"
     volumes:
       - addy_data:/data
     env_file:
